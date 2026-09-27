@@ -1,0 +1,100 @@
+<div id="app">
+  <canvas id="c3d"></canvas>
+  <canvas id="c2d"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-chip"><span class="big">🧀</span><span id="hud-cheese">0/0</span></div>
+      <div class="hud-chip"><span class="big">⏱</span><span id="hud-time">0:00</span></div>
+      <div class="hud-chip" id="hud-lives">❤️❤️❤️</div>
+    </div>
+    <div id="hud-level">Level</div>
+    <div id="hud-stam"><div></div></div>
+    <div id="hud-arrow" class="hide"><div class="arw">⬆️</div><div class="dst">0m</div></div>
+  </div>
+
+  <!-- flash + toast -->
+  <div id="flash"><div class="txt">CAUGHT!</div></div>
+  <div id="toast"></div>
+
+  <!-- Touch controls -->
+  <div id="touch">
+    <div class="tjoy" id="tjoy"><div class="knob" id="tjoy-knob"></div></div>
+    <div class="tbtn" id="tb-jump">JUMP</div>
+    <div class="tbtn" id="tb-sprint">DASH</div>
+  </div>
+
+  <!-- MAIN MENU -->
+  <div class="screen active" id="scr-menu">
+    <div class="title-big">🧀 CHEESE CHASE! 🧀</div>
+    <div class="title-sub">Whiskers the cat vs. Cheddar the mouse — a cartoon chase game</div>
+    <div class="menu-col" style="margin-top:10px">
+      <button class="btn blue" id="bt-3d">🕹️ &nbsp;3D WORLDS</button>
+      <button class="btn green" id="bt-2d">🏃 &nbsp;2D WORLDS</button>
+      <button class="btn" id="bt-help">❓ &nbsp;HOW TO PLAY</button>
+      <button class="btn small red" id="bt-sound">🔊 Sound: ON</button>
+    </div>
+    <div class="footnote">100% offline game — no internet needed, ever. 📴<br>Original cat &amp; mouse characters inspired by classic cartoon chases.</div>
+  </div>
+  <div id="menu-badge">🎬 demo running behind the menu</div>
+
+  <!-- LEVEL SELECT (filled by JS) -->
+  <div class="screen dim" id="scr-select">
+    <div class="title-big" style="font-size:clamp(26px,5vw,44px)" id="sel-title">Choose a level</div>
+    <div class="lvl-grid" id="sel-grid"></div>
+    <button class="btn small" id="bt-sel-back" style="margin-top:8px">⬅ Back</button>
+  </div>
+
+  <!-- HELP -->
+  <div class="screen dim" id="scr-help">
+    <div class="title-big" style="font-size:clamp(26px,5vw,42px)">How to play</div>
+    <div class="help-box">
+      <h3>🐭 You are Cheddar the mouse</h3>
+      Grab <b>all the cheese</b> in the level, then dash to your <b>mouse hole</b> before Whiskers the cat catches you!
+      <h3>🕹️ 3D worlds</h3>
+      Move with <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> or <span class="kbd">↑</span><span class="kbd">←</span><span class="kbd">↓</span><span class="kbd">→</span> &nbsp;•&nbsp; <span class="kbd">Space</span> hop (hops over traps!) &nbsp;•&nbsp; <span class="kbd">Shift</span> sprint
+      <h3>🏃 2D worlds</h3>
+      <span class="kbd">←</span><span class="kbd">→</span> run &nbsp;•&nbsp; <span class="kbd">Space</span> jump (press twice for double-jump) — outrun the cat chasing you!
+      <h3>⚠️ Watch out</h3>
+      <b>Mousetraps</b> snap you in place (and the cat hears it!). Hopping over them is safe. Lose all ❤️❤️❤️ and it's game over.
+      <h3>Other keys</h3>
+      <span class="kbd">P</span>/<span class="kbd">Esc</span> pause &nbsp;•&nbsp; <span class="kbd">R</span> restart level &nbsp;•&nbsp; <span class="kbd">M</span> sound on/off
+      <h3>📱 Touch</h3>
+      On phones &amp; tablets an on-screen joystick and buttons appear automatically.
+    </div>
+    <button class="btn" id="bt-help-back" style="margin-top:6px">Got it!</button>
+  </div>
+
+  <!-- PAUSE -->
+  <div class="screen dim" id="scr-pause">
+    <div class="big-msg">⏸ Paused</div>
+    <div class="menu-col">
+      <button class="btn green" id="bt-resume">▶ Resume</button>
+      <button class="btn blue" id="bt-restart">🔄 Restart level</button>
+      <button class="btn red" id="bt-quit">🏠 Quit to menu</button>
+    </div>
+  </div>
+
+  <!-- LEVEL COMPLETE -->
+  <div class="screen dim" id="scr-complete">
+    <div class="big-msg" style="color:#9fe08a">🎉 Level complete!</div>
+    <div class="stars" id="cmp-stars">⭐⭐⭐</div>
+    <div class="stat-line" id="cmp-stats"></div>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn green" id="bt-next">➡ Next level</button>
+      <button class="btn blue" id="bt-replay">🔄 Replay</button>
+      <button class="btn red" id="bt-cmp-menu">🏠 Menu</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen dim" id="scr-over">
+    <div class="big-msg" style="color:#ff8d7a">😿 Game over</div>
+    <div class="stat-line" id="over-stats"></div>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn green" id="bt-retry">🔄 Try again</button>
+      <button class="btn red" id="bt-over-menu">🏠 Menu</button>
+    </div>
+  </div>
+</div>
