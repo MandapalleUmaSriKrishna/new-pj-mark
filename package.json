@@ -1,0 +1,56 @@
+{
+  "name": "krishna-digital-certificate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Krishna Digital Certificate - universal multi-tenant SaaS for issuing, verifying and managing digital certificates (web + mobile PWA).",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.9.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "npm run dev --workspace @kdc/api",
+    "dev:web": "npm run dev --workspace @kdc/web",
+    "build": "npm run build --workspace @kdc/shared && npm run build --workspace @kdc/api && npm run build --workspace @kdc/web",
+    "build:shared": "npm run build --workspace @kdc/shared",
+    "build:api": "npm run build --workspace @kdc/api",
+    "build:web": "npm run build --workspace @kdc/web",
+    "start": "node scripts/dev.mjs --prod",
+    "start:api": "npm run start --workspace @kdc/api",
+    "start:web": "npm run start --workspace @kdc/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,css,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,css,yml,yaml}\"",
+    "test": "npm run test --workspaces --if-present",
+    "test:api": "npm run test --workspace @kdc/api",
+    "test:web": "npm run test --workspace @kdc/web",
+    "test:e2e": "npm run test:e2e --workspace @kdc/api",
+    "test:playwright": "npm run test:playwright --workspace @kdc/web",
+    "seed": "npm run seed --workspace @kdc/api",
+    "verify": "node scripts/verify.mjs",
+    "security:audit": "npm audit --omit=dev --audit-level=high || true",
+    "docker:build": "docker build -f docker/api.Dockerfile -t kdc-api . && docker build -f docker/web.Dockerfile -t kdc-web .",
+    "docker:up": "docker compose --env-file .env -f docker/docker-compose.yml up -d --build",
+    "docker:down": "docker compose --env-file .env -f docker/docker-compose.yml down",
+    "docker:logs": "docker compose --env-file .env -f docker/docker-compose.yml logs -f --tail=100",
+    "docker:ps": "docker compose --env-file .env -f docker/docker-compose.yml ps",
+    "postinstall": "node scripts/ensure-native.mjs",
+    "native:check": "node scripts/ensure-native.mjs --check"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1"
+  }
+}

@@ -1,0 +1,320 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind CSS 4 is configured in CSS (no tailwind.config.js). The tokens below
+ * are the design system: they map to CSS variables so tenant white-label
+ * colours can be layered on top at runtime (see `brandVars()` in lib/branding).
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans',
+    'Noto Sans Devanagari', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-display: 'Georgia', 'Times New Roman', ui-serif, serif;
+
+  --color-ink-50: #f6f7f9;
+  --color-ink-100: #eceef2;
+  --color-ink-200: #d5d9e2;
+  --color-ink-300: #b0b8c9;
+  --color-ink-400: #8592ab;
+  --color-ink-500: #657390;
+  --color-ink-600: #505c76;
+  --color-ink-700: #414a60;
+  --color-ink-800: #383f50;
+  --color-ink-900: #232838;
+  --color-ink-950: #14171f;
+
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #d9e5ff;
+  --color-brand-200: #bcd1ff;
+  --color-brand-300: #8eb3ff;
+  --color-brand-400: #598aff;
+  --color-brand-500: #3361fb;
+  --color-brand-600: #1d40f0;
+  --color-brand-700: #162edd;
+  --color-brand-800: #1827b3;
+  --color-brand-900: #1a278d;
+  --color-brand-950: #151a56;
+
+  --color-gold-300: #f0d99a;
+  --color-gold-400: #e5c273;
+  --color-gold-500: #d4a94a;
+  --color-gold-600: #b98b33;
+
+  --color-ok-500: #16a34a;
+  --color-ok-50: #ecfdf3;
+  --color-warn-500: #d97706;
+  --color-warn-50: #fffbeb;
+  --color-danger-500: #dc2626;
+  --color-danger-50: #fef2f2;
+
+  --radius-xl2: 1.25rem;
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.06), 0 1px 3px 0 rgb(16 24 40 / 0.1);
+  --shadow-pop: 0 12px 32px -8px rgb(16 24 40 / 0.24), 0 2px 6px -2px rgb(16 24 40 / 0.08);
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --kdc-brand: #1d40f0;
+    --kdc-brand-ink: #ffffff;
+    --kdc-accent: #d4a94a;
+    --kdc-surface: #ffffff;
+    --kdc-surface-sunken: #f6f7f9;
+    --kdc-border: #d5d9e2;
+    --kdc-text: #14171f;
+    --kdc-text-muted: #505c76;
+  }
+
+  .dark {
+    --kdc-surface: #14171f;
+    --kdc-surface-sunken: #0f1218;
+    --kdc-border: #383f50;
+    --kdc-text: #f6f7f9;
+    --kdc-text-muted: #b0b8c9;
+  }
+
+  * {
+    border-color: var(--kdc-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  body {
+    background: var(--kdc-surface-sunken);
+    color: var(--kdc-text);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    /* Mobile PWA: keep content clear of the notch / gesture bar. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Visible, consistent focus for keyboard users (WCAG 2.4.7). */
+  :focus-visible {
+    outline: 3px solid color-mix(in oklab, var(--kdc-brand) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
+  }
+
+  /* Honour the user's platform theme unless they picked one in the app. */
+  @media (prefers-color-scheme: dark) {
+    html:not(.light) {
+      color-scheme: dark;
+    }
+  }
+}
+
+@layer components {
+  .kdc-card {
+    background: var(--kdc-surface);
+    border: 1px solid var(--kdc-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+  }
+
+  .kdc-input {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--kdc-border);
+    background: var(--kdc-surface);
+    color: var(--kdc-text);
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  .kdc-input::placeholder {
+    color: var(--kdc-text-muted);
+    opacity: 0.75;
+  }
+  .kdc-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .kdc-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--kdc-text);
+    margin-bottom: 0.3rem;
+  }
+
+  .kdc-hint {
+    font-size: 0.75rem;
+    color: var(--kdc-text-muted);
+  }
+
+  .kdc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.55rem 1rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      transform 60ms ease;
+    touch-action: manipulation;
+    min-height: 2.5rem;
+  }
+  .kdc-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .kdc-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .kdc-btn-primary {
+    background: var(--kdc-brand);
+    color: var(--kdc-brand-ink);
+  }
+  .kdc-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.07);
+  }
+
+  .kdc-btn-secondary {
+    background: var(--kdc-surface);
+    border-color: var(--kdc-border);
+    color: var(--kdc-text);
+  }
+  .kdc-btn-secondary:hover:not(:disabled) {
+    background: var(--kdc-surface-sunken);
+  }
+
+  .kdc-btn-ghost {
+    background: transparent;
+    color: var(--kdc-text-muted);
+  }
+  .kdc-btn-ghost:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--kdc-text) 8%, transparent);
+    color: var(--kdc-text);
+  }
+
+  .kdc-btn-danger {
+    background: var(--color-danger-500);
+    color: #fff;
+  }
+
+  .kdc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    border: 1px solid var(--kdc-border);
+    background: var(--kdc-surface-sunken);
+    padding: 0.1rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: capitalize;
+  }
+
+  .kdc-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    background: var(--kdc-brand);
+    color: var(--kdc-brand-ink);
+    padding: 0.6rem 1rem;
+    border-radius: 0 0 var(--radius-lg) 0;
+    font-weight: 600;
+  }
+  .kdc-skip-link:focus {
+    left: 0;
+  }
+
+  /* Designer canvas surface */
+  .kdc-canvas-stage {
+    background-image:
+      linear-gradient(45deg, rgb(0 0 0 / 0.04) 25%, transparent 25%),
+      linear-gradient(-45deg, rgb(0 0 0 / 0.04) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgb(0 0 0 / 0.04) 75%),
+      linear-gradient(-45deg, transparent 75%, rgb(0 0 0 / 0.04) 75%);
+    background-size: 16px 16px;
+    background-position:
+      0 0,
+      0 8px,
+      8px -8px,
+      -8px 0px;
+  }
+
+  .kdc-grid-lines {
+    background-image:
+      linear-gradient(to right, rgb(0 0 0 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(0 0 0 / 0.06) 1px, transparent 1px);
+    background-size: 24pt 24pt;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Certificate preview / print: never show app chrome on paper. */
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}

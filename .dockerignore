@@ -1,0 +1,51 @@
+# Keeps the build context small and, more importantly, keeps local secrets and
+# local build output out of the image. Both Dockerfiles build from source inside
+# the image, so nothing prebuilt is needed here.
+
+# Version control and CI
+.git
+.gitignore
+.github
+
+# Dependencies (installed inside the image from the lockfile)
+**/node_modules
+
+# Build output (recompiled inside the image)
+**/dist
+**/.next
+**/.swc
+**/*.tsbuildinfo
+**/coverage
+
+# Runtime data: generated PDFs, uploads, the mail log driver's .eml files.
+# ANCHORED, for the same reason as .gitignore: an unanchored `storage` would
+# also exclude apps/api/src/infra/storage, which is SOURCE CODE (the object
+# storage port and its local/S3 adapters).
+/data
+/apps/*/data
+/apps/*/storage
+/packages/*/data
+**/tmp
+
+# Secrets and local config. Compose passes what the container needs explicitly;
+# baking a .env into an image layer would leak it to anyone who can pull it.
+.env
+.env.*
+!.env.example
+
+# Reports and local artifacts
+playwright-report
+test-results
+**/*.log
+npm-debug.log*
+
+# Docs are not needed at runtime
+docs
+*.md
+!apps/web/public/**/*.md
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.idea
+.vscode
