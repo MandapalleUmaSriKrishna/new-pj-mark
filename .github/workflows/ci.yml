@@ -1,0 +1,318 @@
+# ---------------------------------------------------------------------------
+# Continuous integration for Krishna Digital Certificate.
+#
+# Jobs are split so a failure says WHICH layer broke: static analysis, unit
+# tests, the live HTTP surface (smoke), production builds, container images and
+# browser E2E. `ci` is the aggregate gate - point branch protection at it.
+#
+# Nothing here needs credentials for a third party. The smoke and browser jobs
+# boot the API with its in-process adapters (memory store, memory queue, local
+# storage, log mail) exactly as documented in .env.example, so CI proves the
+# HTTP surface, not a specific MongoDB or Redis deployment.
+# ---------------------------------------------------------------------------
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22.22.3'
+  # The API reads no .env in CI: KDC_SKIP_DOTENV keeps the run reproducible and
+  # stops a committed .env from ever changing CI behaviour.
+  KDC_SKIP_DOTENV: 'true'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  quality:
+    name: Types, lint, format, audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # npm can install the musl build of lightningcss on a glibc runner (its
+      # lockfile entries carry no `libc` field). That makes EVERY page 500 at
+      # runtime while lint, types and unit tests all still pass. The `npm ci`
+      # postinstall repairs it; this step asserts the repair worked.
+      - name: Verify native bindings load
+        run: npm run native:check
+
+      - name: Build @kdc/shared (imported by both apps)
+        run: npm run build --workspace @kdc/shared
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Lint (zero warnings allowed)
+        run: npx eslint . --max-warnings=0
+
+      - name: Check formatting
+        run: npm run format:check
+
+      # Production dependencies only, high and above. Two moderate advisories
+      # are known and accepted: they are transitive through exceljs -> uuid
+      # (GHSA-w5hq-g745-h8pq) and the only "fix" npm offers is a breaking
+      # downgrade to exceljs 3.4.0. See docs/DEPLOYMENT.md#dependency-audit.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  api-tests:
+    name: API unit tests (jest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build --workspace @kdc/shared
+      - name: Run jest with coverage
+        run: npm run test:cov --workspace @kdc/api
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-coverage
+          path: apps/api/coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  web-tests:
+    name: Web unit tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build --workspace @kdc/shared
+      - name: Run vitest
+        run: npm run test --workspace @kdc/web
+
+  smoke:
+    name: E2E smoke against a live API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build --workspace @kdc/shared
+
+      - name: Start the API with in-process adapters
+        working-directory: apps/api
+        env:
+          NODE_ENV: test
+          LOG_LEVEL: warn
+          HOST: 127.0.0.1
+          PORT: '4000'
+          DATA_DRIVER: memory
+          QUEUE_DRIVER: memory
+          CACHE_DRIVER: memory
+          EVENT_BUS_DRIVER: memory
+          MAIL_DRIVER: log
+          MAIL_LOG_DIR: ${{ runner.temp }}/kdc-mail
+          STORAGE_DRIVER: local
+          STORAGE_LOCAL_DIR: ${{ runner.temp }}/kdc-storage
+          SEED_DEMO_DATA: 'false'
+          APP_URL: http://127.0.0.1:4000
+          API_URL: http://127.0.0.1:4000
+          ENCRYPTION_MASTER_KEY: ci-only-master-key-not-a-real-secret-32
+          JWT_ACCESS_SECRET: ci-only-access-secret-not-a-real-32
+          JWT_REFRESH_SECRET: ci-only-refresh-secret-not-a-real-32
+          SESSION_COOKIE_SECRET: ci-only-cookie-secret-not-a-real-32
+          WEBHOOK_SIGNING_FALLBACK_SECRET: ci-only-webhook-secret-not-real-32
+        run: node -r ts-node/register src/main.ts > ${{ runner.temp }}/api.log 2>&1 &
+
+      - name: Wait for the API to become healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4000/api/v1/health/live > /dev/null; then
+              echo "API healthy after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become healthy; log follows:"
+          cat "${{ runner.temp }}/api.log"
+          exit 1
+
+      - name: Run the smoke suite
+        run: node scripts/smoke.mjs --api http://127.0.0.1:4000 --prefix api/v1
+
+      - name: Publish the API log
+        if: always()
+        run: cat "${{ runner.temp }}/api.log"
+
+      - name: Publish the health report
+        if: always()
+        run: curl -s http://127.0.0.1:4000/api/v1/health || true
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # npm can install the musl build of lightningcss on a glibc runner (its
+      # lockfile entries carry no `libc` field). That makes EVERY page 500 at
+      # runtime while lint, types and unit tests all still pass. The `npm ci`
+      # postinstall repairs it; this step asserts the repair worked.
+      - name: Verify native bindings load
+        run: npm run native:check
+
+      - name: Build everything (shared, api, web)
+        run: npm run build
+        env:
+          NEXT_STANDALONE: 'true'
+
+      - name: Assert the artifacts exist
+        run: |
+          test -f packages/shared/dist/index.js
+          test -f apps/api/dist/main.js
+          test -f apps/web/.next/BUILD_ID
+          test -f apps/web/.next/standalone/apps/web/server.js
+          echo "artifacts present"
+
+      - name: Upload API build
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-dist
+          path: apps/api/dist/
+          retention-days: 7
+
+  docker:
+    name: Container images
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Built, not pushed: this workflow has no registry credentials and does
+      # not claim to publish anything. Add a login step and --push when a
+      # registry is wired up.
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: false
+          tags: kdc-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: false
+          tags: kdc-web:ci
+          build-args: |
+            API_INTERNAL_URL=http://api:4000
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  browser-e2e:
+    name: Browser E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build --workspace @kdc/shared
+
+      - name: Install Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      # Playwright's own webServer config starts BOTH the API and the web app
+      # (see apps/web/playwright.config.ts), so nothing else is launched here.
+      - name: Run the browser suite
+        working-directory: apps/web
+        env:
+          NODE_ENV: test
+          DATA_DRIVER: memory
+          QUEUE_DRIVER: memory
+          CACHE_DRIVER: memory
+          EVENT_BUS_DRIVER: memory
+          MAIL_DRIVER: log
+          STORAGE_DRIVER: local
+          SEED_DEMO_DATA: 'true'
+          SEED_DEMO_EMAIL: demo@kdc.local
+          SEED_DEMO_PASSWORD: Kdc!Sample-2026
+          ENCRYPTION_MASTER_KEY: ci-only-master-key-not-a-real-secret-32
+          JWT_ACCESS_SECRET: ci-only-access-secret-not-a-real-32
+          JWT_REFRESH_SECRET: ci-only-refresh-secret-not-a-real-32
+          SESSION_COOKIE_SECRET: ci-only-cookie-secret-not-a-real-32
+          WEBHOOK_SIGNING_FALLBACK_SECRET: ci-only-webhook-secret-not-real-32
+        run: npx playwright test
+
+      - name: Upload the Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Single gate for branch protection: fails if ANY job above failed, was
+  # skipped unexpectedly, or never reported.
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [quality, api-tests, web-tests, smoke, build, docker, browser-e2e]
+    steps:
+      - name: Require every job to have succeeded
+        run: |
+          echo '${{ toJSON(needs) }}' | node -e '
+            let raw = "";
+            process.stdin.on("data", (c) => (raw += c));
+            process.stdin.on("end", () => {
+              const needs = JSON.parse(raw);
+              const bad = Object.entries(needs).filter(([, job]) => job.result !== "success");
+              for (const [name, job] of Object.entries(needs)) {
+                console.log(`${job.result === "success" ? "ok  " : "FAIL"} ${name}: ${job.result}`);
+              }
+              if (bad.length) {
+                console.error(`\n${bad.length} required job(s) did not succeed: ${bad.map(([n]) => n).join(", ")}`);
+                process.exit(1);
+              }
+              console.log("\nAll required jobs succeeded.");
+            });
+          '

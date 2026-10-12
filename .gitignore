@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.swc/
+coverage/
+
+# Runtime data (never commit generated artifacts / uploaded files).
+# These patterns are ANCHORED on purpose. An unanchored `data/` or `storage/`
+# matches a directory with that name at ANY depth, which silently swallows
+# source folders - e.g. apps/api/src/infra/storage/ (the object-storage port and
+# its adapters) - and committed code disappears from the working tree.
+/data/
+/tmp/
+/apps/*/data/
+/apps/*/storage/
+/apps/*/tmp/
+/packages/*/data/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error*
+pnpm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!.env.test.example
+*.pem
+*.key
+secrets/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Testing
+playwright-report/
+test-results/
+.nyc_output/
+
+# Misc
+.venv/
+__pycache__/
+*.local
+
+# Safety net: nothing inside a source or test directory is ever ignored,
+# whatever the folder is called. Keep this LAST - in .gitignore the final
+# matching pattern wins, so this overrides the runtime-data patterns above.
+!apps/*/src/**
+!apps/*/test/**
+!packages/*/src/**

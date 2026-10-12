@@ -1,0 +1,23 @@
+{
+  "rootDir": "..",
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
+  "transform": {
+    "^.+\\.(t|j)s$": [
+      "@swc/jest",
+      {
+        "jsc": {
+          "parser": { "syntax": "typescript", "decorators": true, "dynamicImport": true },
+          "transform": { "legacyDecorator": true, "decoratorMetadata": true },
+          "target": "es2023",
+          "keepClassNames": true
+        },
+        "module": { "type": "commonjs" }
+      }
+    ]
+  },
+  "moduleNameMapper": { "^@/(.*)$": "<rootDir>/src/$1" },
+  "testTimeout": 60000
+}

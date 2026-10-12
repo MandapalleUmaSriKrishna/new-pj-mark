@@ -1,0 +1,163 @@
+# ---------------------------------------------------------------------------
+# Krishna Digital Certificate - full stack
+#
+#   cp .env.example .env      # then edit EVERY value marked CHANGE ME
+#   npm run docker:up         # == docker compose --env-file .env -f docker/docker-compose.yml up -d --build
+#
+# Services: mongo (single-node replica set), redis, api (NestJS :4000),
+# web (Next.js :3000). The web container proxies /api/v1 to the api container,
+# so only these two ports are published.
+#
+# The five secrets below use `${VAR:?...}` interpolation ON PURPOSE: compose
+# refuses to start unless they are set in .env (or the shell). A deployment that
+# boots with the development defaults would encrypt data under a published key,
+# so failing loudly is the correct behaviour.
+#
+# WHY A REPLICA SET: the API uses MongoDB transactions for multi-document
+# operations (bulk issuance, plan changes). A standalone mongod cannot run them.
+# `rs0` here is a single member - enough for transactions, NOT for durability.
+# Use a real replica set or Atlas in production.
+# ---------------------------------------------------------------------------
+
+name: kdc
+
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongo-data:/data/db
+    # Initiates the replica set on first boot, then reports healthy once it has
+    # a primary. Idempotent: rs.status() succeeds on every later check.
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status().ok } catch (err) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    # Not published: only the api container needs to reach it. Add
+    # "127.0.0.1:27017:27017" under ports if you want a local client.
+    networks: [kdc]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF persistence so queued jobs and rate-limit counters survive a restart.
+    # noeviction because BullMQ must never have job keys evicted under pressure.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    networks: [kdc]
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    image: kdc-api:latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '4000'
+      # Real drivers: the in-process fallbacks are for development only, and the
+      # API refuses DATA_DRIVER=memory in production unless explicitly
+      # acknowledged with ALLOW_MEMORY_STORE_IN_PRODUCTION=true.
+      DATA_DRIVER: mongo
+      MONGODB_URI: mongodb://mongo:27017/kdc?replicaSet=rs0
+      MONGODB_DB: kdc
+      QUEUE_DRIVER: bullmq
+      CACHE_DRIVER: redis
+      EVENT_BUS_DRIVER: redis
+      REDIS_URL: redis://redis:6379
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      MAIL_DRIVER: ${MAIL_DRIVER:-log}
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-manual}
+      # Container-network URLs. Override APP_URL/API_URL in .env with your real
+      # hostnames: they are embedded in emails, download links and QR targets.
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:4000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      TRUST_PROXY: 'true'
+      # Never seed demo data into a real deployment.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      MEMORY_STORE_SEED: 'false'
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY:?set a unique ENCRYPTION_MASTER_KEY of at least 32 characters (see .env.example)}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set a unique JWT_ACCESS_SECRET of at least 32 characters}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set a unique JWT_REFRESH_SECRET of at least 32 characters}
+      SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?set a unique SESSION_COOKIE_SECRET of at least 32 characters}
+      WEBHOOK_SIGNING_FALLBACK_SECRET: ${WEBHOOK_SIGNING_FALLBACK_SECRET:?set a unique WEBHOOK_SIGNING_FALLBACK_SECRET of at least 32 characters}
+    ports:
+      - '${API_PORT:-4000}:4000'
+    volumes:
+      # Generated PDFs and the mail log driver's .eml files.
+      - api-data:/repo/apps/api/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks: [kdc]
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+      args:
+        # Baked in at BUILD time (see the note in docker/web.Dockerfile).
+        API_INTERNAL_URL: http://api:4000
+        APP_URL: ${APP_URL:-http://localhost:3000}
+    image: kdc-web:latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks: [kdc]
+
+volumes:
+  mongo-data:
+  redis-data:
+  api-data:
+
+networks:
+  kdc:
+    driver: bridge
