@@ -1,0 +1,44 @@
+{
+  "name": "otp-shield",
+  "version": "1.2.0",
+  "private": true,
+  "description": "OTP Shield \u2014 real-time SMS phone verification powered by Twilio Verify, with a secure Express backend and an accessible, responsive UI.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test --test-reporter=spec \"test/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage \"test/**/*.test.js\"",
+    "check:twilio": "node scripts/check-twilio.js",
+    "generate:countries": "node scripts/generate-countries.js",
+    "verify": "npm test",
+    "test:watch": "node --test --watch \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "compression": "^1.8.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "libphonenumber-js": "^1.11.19",
+    "twilio": "^5.4.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0"
+  },
+  "keywords": [
+    "otp",
+    "sms",
+    "twilio-verify",
+    "phone-verification",
+    "express",
+    "two-factor"
+  ]
+}

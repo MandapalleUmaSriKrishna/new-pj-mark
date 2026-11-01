@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>OTP Shield — Real SMS phone verification</title>
+    <meta
+      name="description"
+      content="OTP Shield verifies phone numbers with a real six-digit SMS code sent through Twilio Verify. Server-side checks, rate limits, expiry timers and no simulated success."
+    />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#070b16" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles/app.css" />
+    <script src="/js/theme-init.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <div class="backdrop" aria-hidden="true">
+      <span class="backdrop__glow backdrop__glow--one"></span>
+      <span class="backdrop__glow backdrop__glow--two"></span>
+      <span class="backdrop__grid"></span>
+    </div>
+
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="#/verify" aria-label="OTP Shield home">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" focusable="false">
+              <path
+                d="M16 2.8 27 7v8.4c0 6.3-4.4 11.6-11 13.8C9.4 27 5 21.7 5 15.4V7l11-4.2Z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+              />
+              <path
+                d="m10.6 15.6 3.6 3.6 7.2-7.4"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <span class="brand__text">
+            <span class="brand__name">OTP Shield</span>
+            <span class="brand__sub">Twilio Verify</span>
+          </span>
+        </a>
+
+        <nav class="nav" aria-label="Primary">
+          <a class="nav__link" href="#/verify" data-route="verify">Verify</a>
+          <a class="nav__link" href="#/profile" data-route="profile">Profile</a>
+        </nav>
+
+        <div class="site-header__actions">
+          <span class="status-pill" id="session-pill" data-state="unverified">
+            <span class="status-pill__dot" aria-hidden="true"></span>
+            <span class="status-pill__label" id="session-pill-label">Not verified</span>
+          </span>
+          <button
+            class="icon-button"
+            id="theme-toggle"
+            type="button"
+            aria-label="Switch to light theme"
+            aria-pressed="false"
+          >
+            <svg class="icon icon--sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
+            </svg>
+            <svg class="icon icon--moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20.5 14.4A8.6 8.6 0 0 1 9.6 3.5a8.8 8.8 0 1 0 10.9 10.9Z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="shell">
+      <div class="banner banner--warning" id="config-banner" role="alert" hidden>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3.2 22 20.4H2L12 3.2Z" />
+          <path d="M12 9.5v4.6M12 17.3v.2" />
+        </svg>
+        <div class="banner__body">
+          <p class="banner__title">SMS delivery is not configured on this server</p>
+          <p class="banner__text" id="config-banner-text">
+            Add your Twilio Verify credentials to the server environment and restart. Sending is
+            disabled on purpose: OTP Shield never simulates a successful verification.
+          </p>
+        </div>
+      </div>
+
+      <div class="banner banner--danger" id="offline-banner" role="alert" hidden>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 8.5v5M12 16.8v.2" />
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+        <div class="banner__body">
+          <p class="banner__title">We can’t reach the OTP Shield server</p>
+          <p class="banner__text" id="offline-banner-text">
+            Check your internet connection and try again. Nothing was sent or verified.
+          </p>
+        </div>
+        <button class="button button--ghost button--small" type="button" id="retry-connection">
+          Retry
+        </button>
+      </div>
+    </div>
+
+    <main id="main" class="shell main" tabindex="-1">
+      <!-- ───────────────────────────── Verify view ───────────────────────────── -->
+      <section id="view-verify" class="view" aria-labelledby="hero-title">
+        <div class="hero">
+          <p class="eyebrow">
+            <span class="eyebrow__dot" aria-hidden="true"></span>
+            Real SMS · Server-verified
+          </p>
+          <h1 class="hero__title" id="hero-title">
+            Verify a phone number with a <span class="text-gradient">real SMS code</span>.
+          </h1>
+          <p class="hero__lead">
+            OTP Shield sends a genuine six-digit code through Twilio Verify, checks it on the
+            server, and enforces expiry, resend cooldowns and rate limits. Nothing is simulated —
+            if the code is wrong or expired, you stay unverified.
+          </p>
+          <ul class="hero__points">
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m5 12.6 4.2 4.2L19 7" />
+              </svg>
+              Codes generated and checked by Twilio Verify
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m5 12.6 4.2 4.2L19 7" />
+              </svg>
+              The browser can never approve itself
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m5 12.6 4.2 4.2L19 7" />
+              </svg>
+              Attempts, resends and expiry enforced per session
+            </li>
+          </ul>
+        </div>
+
+        <div class="workspace">
+          <div class="card card--form" aria-labelledby="form-heading">
+            <ol class="stepper" id="stepper" aria-label="Verification progress">
+              <li class="stepper__item" data-step="phone" aria-current="step">
+                <span class="stepper__index" aria-hidden="true">1</span>
+                <span class="stepper__label">Phone</span>
+              </li>
+              <li class="stepper__item" data-step="code">
+                <span class="stepper__index" aria-hidden="true">2</span>
+                <span class="stepper__label">Code</span>
+              </li>
+              <li class="stepper__item" data-step="verified">
+                <span class="stepper__index" aria-hidden="true">3</span>
+                <span class="stepper__label">Verified</span>
+              </li>
+            </ol>
+
+            <h2 class="card__title" id="form-heading">Enter your phone number</h2>
+            <p class="card__subtitle" id="form-subtitle">
+              We’ll text you a six-digit code. Standard SMS rates may apply.
+            </p>
+
+            <!-- Step 1: phone -->
+            <form id="phone-form" novalidate>
+              <div class="field">
+                <label class="field__label" for="country-trigger" id="country-label">Country</label>
+                <div class="country" id="country-picker">
+                  <button
+                    type="button"
+                    class="country__trigger"
+                    id="country-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="country-panel"
+                    aria-labelledby="country-label country-trigger"
+                  >
+                    <span class="country__flag" id="country-flag" aria-hidden="true">🇮🇳</span>
+                    <span class="country__name" id="country-name">India</span>
+                    <span class="country__dial" id="country-dial">+91</span>
+                    <svg class="icon country__chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="m6 9.5 6 6 6-6" />
+                    </svg>
+                  </button>
+                  <div class="country__panel" id="country-panel" hidden>
+                    <div class="country__search">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <circle cx="11" cy="11" r="6.4" />
+                        <path d="m16.2 16.2 4 4" />
+                      </svg>
+                      <input
+                        type="text"
+                        id="country-search"
+                        class="country__search-input"
+                        placeholder="Search 245 countries"
+                        aria-label="Search countries"
+                        autocomplete="off"
+                        spellcheck="false"
+                        role="combobox"
+                        aria-expanded="true"
+                        aria-controls="country-listbox"
+                        aria-autocomplete="list"
+                      />
+                    </div>
+                    <ul class="country__list" id="country-listbox" role="listbox" aria-label="Countries"></ul>
+                    <p class="country__empty" id="country-empty" hidden>No countries match your search.</p>
+                  </div>
+                  <input type="hidden" name="country" id="country-value" value="IN" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field__label" for="phone">Phone number</label>
+                <div class="phone-input" id="phone-input-wrap">
+                  <span class="phone-input__prefix" id="phone-prefix" aria-hidden="true">+91</span>
+                  <input
+                    class="phone-input__control"
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    inputmode="tel"
+                    autocomplete="tel-national"
+                    placeholder="98765 43210"
+                    aria-describedby="phone-help phone-error"
+                    spellcheck="false"
+                    required
+                  />
+                </div>
+                <p class="field__error" id="phone-error" role="alert" hidden></p>
+                <p class="field__help" id="phone-help">
+                  Use your mobile number. We convert it to E.164 format before sending.
+                </p>
+              </div>
+
+              <button class="button button--primary button--full" type="submit" id="send-button">
+                <span class="button__spinner" aria-hidden="true"></span>
+                <span class="button__label">Send OTP</span>
+              </button>
+
+              <p class="form-note" id="provider-notice" hidden>
+                Sending is disabled until Twilio Verify credentials are configured on the server.
+                Nothing is faked.
+              </p>
+
+              <p class="fineprint">
+                By requesting a code you agree to receive one SMS from Twilio Verify. This page never
+                asks for your password or payment details.
+              </p>
+            </form>
+
+            <!-- Step 2: code -->
+            <form id="code-form" novalidate hidden>
+              <p class="sent-to">
+                Code sent to <strong id="code-sent-to">your phone</strong>
+                <button class="link-button" type="button" id="change-number">Change</button>
+              </p>
+
+              <fieldset class="field field--code">
+                <legend class="field__label">Six-digit code</legend>
+                <div
+                  class="otp"
+                  id="otp-group"
+                  role="group"
+                  aria-label="Six digit verification code"
+                  aria-describedby="code-help code-error"
+                >
+                  <input class="otp__digit" type="text" id="otp-1" inputmode="numeric" autocomplete="one-time-code" aria-label="Digit 1 of 6" maxlength="1" pattern="[0-9]*" />
+                  <input class="otp__digit" type="text" id="otp-2" inputmode="numeric" autocomplete="off" aria-label="Digit 2 of 6" maxlength="1" pattern="[0-9]*" />
+                  <input class="otp__digit" type="text" id="otp-3" inputmode="numeric" autocomplete="off" aria-label="Digit 3 of 6" maxlength="1" pattern="[0-9]*" />
+                  <input class="otp__digit" type="text" id="otp-4" inputmode="numeric" autocomplete="off" aria-label="Digit 4 of 6" maxlength="1" pattern="[0-9]*" />
+                  <input class="otp__digit" type="text" id="otp-5" inputmode="numeric" autocomplete="off" aria-label="Digit 5 of 6" maxlength="1" pattern="[0-9]*" />
+                  <input class="otp__digit" type="text" id="otp-6" inputmode="numeric" autocomplete="off" aria-label="Digit 6 of 6" maxlength="1" pattern="[0-9]*" />
+                </div>
+                <p class="field__error" id="code-error" role="alert" hidden></p>
+                <p class="field__help" id="code-help">Paste the whole code into any box — we’ll fill the rest.</p>
+                <span class="sr-only" aria-live="polite" id="otp-announcer"></span>
+              </fieldset>
+
+              <div class="timers">
+                <div class="timer" id="expiry-timer">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="8.6" />
+                    <path d="M12 7.6V12l3 1.8" />
+                  </svg>
+                  <span>Code expires in <strong id="expiry-text">10:00</strong></span>
+                </div>
+                <div class="attempts" id="attempts">
+                  <span id="attempts-text">5 attempts left</span>
+                  <span class="attempts__dots" id="attempts-dots" aria-hidden="true"></span>
+                </div>
+              </div>
+              <progress class="lifetime" id="expiry-progress" max="600" value="600" aria-label="Time remaining before the code expires"></progress>
+
+              <button class="button button--primary button--full" type="submit" id="verify-button">
+                <span class="button__spinner" aria-hidden="true"></span>
+                <span class="button__label">Verify OTP</span>
+              </button>
+
+              <div class="resend">
+                <span id="resend-text">You can resend in 30s</span>
+                <button class="link-button" type="button" id="resend-button" disabled>
+                  Resend code
+                </button>
+              </div>
+            </form>
+
+            <!-- Step 3: verified -->
+            <section class="success" id="success-panel" aria-labelledby="success-title" hidden>
+              <div class="success__badge" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                  <path d="m5 12.6 4.2 4.2L19 7" />
+                </svg>
+              </div>
+              <h2 class="success__title" id="success-title" tabindex="-1">Phone number verified</h2>
+              <p class="success__text">
+                <strong id="verified-phone">Your number</strong> was confirmed by Twilio Verify at
+                <span id="verified-time">just now</span>. This session is now marked verified on the
+                server.
+              </p>
+              <ul class="success__facts">
+                <li><span>Method</span><strong>SMS code</strong></li>
+                <li><span>Provider</span><strong id="verified-provider">Twilio Verify</strong></li>
+                <li><span>Status</span><strong class="text-success">Verified</strong></li>
+              </ul>
+              <div class="success__actions">
+                <a class="button button--primary" href="#/profile" id="success-profile-btn">
+                  View verified profile
+                </a>
+                <button class="button button--ghost" type="button" id="success-new-btn">
+                  Verify another number
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <aside class="card card--aside" aria-labelledby="aside-title">
+            <h2 class="card__title card__title--small" id="aside-title">What happens when you tap send</h2>
+            <ol class="flow">
+              <li>
+                <span class="flow__num" aria-hidden="true">1</span>
+                <div>
+                  <p class="flow__title">Validated to E.164</p>
+                  <p class="flow__text">Your number is parsed and normalised on the server.</p>
+                </div>
+              </li>
+              <li>
+                <span class="flow__num" aria-hidden="true">2</span>
+                <div>
+                  <p class="flow__title">Twilio Verify sends the SMS</p>
+                  <p class="flow__text">The code is generated and delivered by Twilio, not by this app.</p>
+                </div>
+              </li>
+              <li>
+                <span class="flow__num" aria-hidden="true">3</span>
+                <div>
+                  <p class="flow__title">Checked server-side</p>
+                  <p class="flow__text">Your browser sends the digits; only Twilio can approve them.</p>
+                </div>
+              </li>
+              <li>
+                <span class="flow__num" aria-hidden="true">4</span>
+                <div>
+                  <p class="flow__title">Session becomes verified</p>
+                  <p class="flow__text">A signed, http-only cookie unlocks the verified profile.</p>
+                </div>
+              </li>
+            </ol>
+
+            <div class="provider" id="provider-card" data-state="loading">
+              <div class="provider__head">
+                <span class="provider__dot" id="provider-dot" aria-hidden="true"></span>
+                <p class="provider__name" id="provider-name">Twilio Verify</p>
+                <span class="provider__state" id="provider-state">Checking…</span>
+              </div>
+              <dl class="provider__meta">
+                <div><dt>Channel</dt><dd>SMS</dd></div>
+                <div><dt>Code lifetime</dt><dd id="provider-ttl">10 minutes</dd></div>
+                <div><dt>Resend cooldown</dt><dd id="provider-cooldown">30 seconds</dd></div>
+                <div><dt>Attempts per code</dt><dd id="provider-attempts">5</dd></div>
+              </dl>
+            </div>
+
+            <p class="aside-note">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 3.6 19 6v6.1c0 4.4-2.9 7.9-7 9.3-4.1-1.4-7-4.9-7-9.3V6l7-2.4Z" />
+              </svg>
+              Credentials stay in the server environment. The browser only talks to this origin.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────── Profile view ──────────────────────────── -->
+      <section id="view-profile" class="view" aria-labelledby="profile-title" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span>Your account</p>
+            <h1 class="page-title" id="profile-title">Profile verification status</h1>
+            <p class="page-lead">
+              This page is generated from server state. Verified users get profile data from a
+              protected endpoint; unverified users are refused with HTTP 403.
+            </p>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="card card--profile">
+            <div class="profile-loading" id="profile-loading">
+              <span class="skeleton skeleton--avatar"></span>
+              <div class="skeleton-group">
+                <span class="skeleton skeleton--line"></span>
+                <span class="skeleton skeleton--line skeleton--short"></span>
+              </div>
+            </div>
+
+            <section id="profile-locked" hidden aria-labelledby="locked-title">
+              <div class="state-badge state-badge--amber" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                  <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+                  <path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5" />
+                </svg>
+              </div>
+              <p class="state-kicker">Unverified account</p>
+              <h2 class="state-title" id="locked-title">No verified phone on this session</h2>
+              <p class="state-text">
+                Your phone number has not been confirmed. Verified-only data is not loaded, and the
+                profile endpoint responds with 403 until you verify.
+              </p>
+              <a class="button button--primary" href="#/verify" id="profile-verify-btn">
+                Verify my phone number
+              </a>
+              <ul class="checklist">
+                <li><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12.6 8.2 16.8 20 5" /></svg> Unlock recovery and 2FA features</li>
+                <li><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12.6 8.2 16.8 20 5" /></svg> Get a verified badge on your profile</li>
+                <li><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12.6 8.2 16.8 20 5" /></svg> Keep your account recoverable</li>
+              </ul>
+            </section>
+
+            <section id="profile-verified" hidden aria-labelledby="verified-name">
+              <div class="profile-head">
+                <div class="avatar" id="profile-avatar" aria-hidden="true">?</div>
+                <div class="profile-head__body">
+                  <div class="profile-head__row">
+                    <h2 class="state-title" id="verified-name">Verified member</h2>
+                    <span class="badge badge--verified">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="m5 12.6 4.2 4.2L19 7" />
+                      </svg>
+                      Verified
+                    </span>
+                  </div>
+                  <p class="state-text state-text--tight" id="profile-phone-formatted">+91 98765 43210</p>
+                </div>
+              </div>
+
+              <dl class="detail-grid">
+                <div class="detail">
+                  <dt>Phone number</dt>
+                  <dd id="profile-phone">—</dd>
+                </div>
+                <div class="detail">
+                  <dt>Verification method</dt>
+                  <dd id="profile-method">SMS code</dd>
+                </div>
+                <div class="detail">
+                  <dt>Provider</dt>
+                  <dd id="profile-provider">Twilio Verify</dd>
+                </div>
+                <div class="detail">
+                  <dt>Verified at</dt>
+                  <dd id="profile-verified-at">—</dd>
+                </div>
+                <div class="detail">
+                  <dt>Session expires</dt>
+                  <dd id="profile-expires">—</dd>
+                </div>
+                <div class="detail">
+                  <dt>Endpoint</dt>
+                  <dd class="detail__code">GET /api/profile · 200</dd>
+                </div>
+              </dl>
+
+              <h3 class="section-label">Unlocked with verification</h3>
+              <ul class="checklist" id="profile-benefits"></ul>
+
+              <div class="profile-actions">
+                <button class="button button--ghost" type="button" id="logout-button">
+                  Sign out of this session
+                </button>
+                <a class="link-button" href="#/verify">Back to verifier</a>
+              </div>
+            </section>
+
+            <div class="inline-error" id="profile-error" role="alert" hidden>
+              <p id="profile-error-text">Something went wrong.</p>
+              <button class="button button--ghost button--small" type="button" id="profile-retry">
+                Try again
+              </button>
+            </div>
+          </div>
+
+          <aside class="card card--aside" aria-labelledby="trust-title">
+            <h2 class="card__title card__title--small" id="trust-title">Verified vs. unverified</h2>
+            <div class="compare">
+              <div class="compare__row">
+                <span class="compare__key">Profile data</span>
+                <span class="compare__unverified">403 refused</span>
+                <span class="compare__verified">200 returned</span>
+              </div>
+              <div class="compare__row">
+                <span class="compare__key">SMS recovery</span>
+                <span class="compare__unverified">Locked</span>
+                <span class="compare__verified">Enabled</span>
+              </div>
+              <div class="compare__row">
+                <span class="compare__key">2FA sign-in</span>
+                <span class="compare__unverified">Locked</span>
+                <span class="compare__verified">Enabled</span>
+              </div>
+              <div class="compare__row">
+                <span class="compare__key">Badge</span>
+                <span class="compare__unverified">None</span>
+                <span class="compare__verified">Verified</span>
+              </div>
+            </div>
+            <div class="legend">
+              <span class="legend__item legend__item--unverified">Unverified</span>
+              <span class="legend__item legend__item--verified">Verified</span>
+            </div>
+            <p class="aside-note">
+              Verification state lives in the server session, keyed by a signed http-only cookie.
+              Clearing cookies or signing out resets it.
+            </p>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <p>OTP Shield · Node.js, Express &amp; Twilio Verify</p>
+        <p class="site-footer__note">
+          Never share a code you did not request. OTP Shield will never call or text you asking for
+          one.
+        </p>
+      </div>
+    </footer>
+
+    <div class="toasts" id="toasts" role="region" aria-label="Notifications" aria-live="polite"></div>
+    <p class="sr-only" aria-live="polite" id="step-announcer"></p>
+
+    <noscript>
+      <div class="shell">
+        <div class="banner banner--danger">
+          <div class="banner__body">
+            <p class="banner__title">JavaScript is required</p>
+            <p class="banner__text">
+              OTP Shield needs JavaScript to send the SMS request and verify your code.
+            </p>
+          </div>
+        </div>
+      </div>
+    </noscript>
+  </body>
+</html>
