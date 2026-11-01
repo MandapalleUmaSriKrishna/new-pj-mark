@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: otp-shield
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "1"
+      # Set these in the Render dashboard (sync: false keeps them out of Git).
+      - key: SESSION_SECRET
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+      # Optional tuning
+      - key: OTP_ALLOWED_COUNTRIES
+        sync: false
+      - key: OTP_TTL_SECONDS
+        value: "600"
+      - key: OTP_RESEND_COOLDOWN_SECONDS
+        value: "30"
+      - key: OTP_MAX_VERIFY_ATTEMPTS
+        value: "5"
+      - key: LOG_LEVEL
+        value: info

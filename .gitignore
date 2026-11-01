@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# logs & temp files
+*.log
+npm-debug.log*
+*.tmp.mjs
+
+# tooling output
+coverage/
+.nyc_output/
+.npm/
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/
+.idea/
